@@ -53,6 +53,8 @@ services:
       DATABASE_URL: "postgresql://wa:wa@postgres:5432/leave_db?schema=public"
       POLICY_GRPC_URL: "policy-svc:50051"
       NODE_ENV: development
+      JWT_SECRET: "super-dev-secret"
+      JWT_EXPIRES_IN: "1d"
     volumes:
       - ..:/workspace
       - leave_api_node_modules:/workspace/services/leave-api/node_modules
