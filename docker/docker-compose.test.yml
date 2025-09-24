@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  postgres:
+    volumes:
+      - ./pg-init/01-create-dbs.sql:/docker-entrypoint-initdb.d/01-create-dbs.sql:ro
+      - ./pg-init/02-create-test-dbs.sql:/docker-entrypoint-initdb.d/02-create-test-dbs.sql:ro
+
+  policy-svc:
+    environment:
+      DATABASE_URL: "postgres://wa:wa@postgres:5432/policy_db_test?sslmode=disable"
+
+  leave-api:
+    environment:
+      DATABASE_URL: "postgresql://wa:wa@postgres:5432/leave_db_test?schema=public"

@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: wa
+      POSTGRES_PASSWORD: wa
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./pg-init/01-create-dbs.sql:/docker-entrypoint-initdb.d/01-create-dbs.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wa -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [wa_net]
+
+  policy-svc:
+    build:
+      context: ..
+      dockerfile: services/policy-go/Dockerfile
+      target: dev
+    container_name: policy-svc
+    working_dir: /workspace/services/policy-go
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: "postgres://wa:wa@postgres:5432/policy_db?sslmode=disable"
+      GRPC_PORT: "50051"
+    ports:
+      - "50051:50051"
+    volumes:
+      - ..:/workspace
+    networks: [wa_net]
+
+  leave-api:
+    build:
+      context: ..
+      dockerfile: services/leave-api/Dockerfile
+    container_name: leave-api
+    depends_on:
+      postgres: { condition: service_healthy }
+      policy-svc: { condition: service_started }
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: "postgresql://wa:wa@postgres:5432/leave_db?schema=public"
+      POLICY_GRPC_URL: "policy-svc:50051"
+    ports:
+      - "3000:3000"
+    networks: [wa_net]
+
+networks:
+  wa_net: {}
+
+volumes:
+  pgdata: {}

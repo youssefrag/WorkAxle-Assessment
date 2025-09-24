@@ -1,0 +1,20 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Run before every rebuild
+pre_cmd = [
+  "/usr/local/go/bin/go mod tidy",
+  "mkdir -p gen",
+  "protoc -I ../../proto --plugin=protoc-gen-go=/go/bin/protoc-gen-go --plugin=protoc-gen-go-grpc=/go/bin/protoc-gen-go-grpc --go_out=paths=source_relative:gen --go-grpc_out=paths=source_relative:gen ../../proto/policy.proto"
+]
+# Use absolute path for go so PATH isn’t a problem
+cmd = "/usr/local/go/bin/go build -o ./tmp/policy ./cmd/server"
+bin = "./tmp/policy"
+
+# Don’t watch generated code to avoid rebuild loops
+include_ext = ["go", "proto"]
+exclude_dir = ["tmp", "vendor", ".git", "gen"]
+
+[log]
+time = true
