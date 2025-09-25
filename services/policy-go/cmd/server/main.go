@@ -32,13 +32,13 @@ func main() {
 	}
 	defer pool.Close()
 
-	lis, err := net.Listen("tcp", addr) // NOTE: capital L
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
 
 	s := grpc.NewServer()
-	policypb.RegisterPolicyServiceServer(s, grpcsrv.New(pool)) // NOTE: *Server
+	policypb.RegisterPolicyServiceServer(s, grpcsrv.New(pool))
 
 	log.Printf("policy-svc listening on %s", addr)
 	if err := s.Serve(lis); err != nil {
