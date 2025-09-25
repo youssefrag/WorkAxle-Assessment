@@ -1,0 +1,1 @@
+export type JwtUser = { sub: number; email: string; teamId?: number };
