@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum LeaveStatus {
+  CREATED
   PENDING_MANAGER
   APPROVED
   REJECTED_MANAGER
@@ -44,7 +45,7 @@ model LeaveRequest {
   teamId     Int
   startDate  DateTime
   endDate    DateTime
-  status     LeaveStatus
+  status     LeaveStatus @default(CREATED)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
