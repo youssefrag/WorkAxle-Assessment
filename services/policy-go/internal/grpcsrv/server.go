@@ -36,15 +36,13 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 	start, err := time.Parse(layout, req.StartDate)
 
 	if err != nil {
-		log.Printf("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 1")
-		return nil, status.Errorf(codes.InvalidArgument, "invalid start_date: %v", err)
+		return &policypb.ValidateLeaveResponse{Ok: false}, nil
 	}
 
 	end, err := time.Parse(layout, req.EndDate)
 
 	if err != nil {
-		log.Printf("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 2")
-		return nil, status.Errorf(codes.InvalidArgument, "invalid end_date: %v", err)
+		return &policypb.ValidateLeaveResponse{Ok: false}, nil
 	}
 
 	// Make sure start <= end
@@ -54,7 +52,7 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 
 	// Start and end have to be in the same year
 	if start.Year() != end.Year() {
-		return nil, status.Error(codes.InvalidArgument, "start_date and end_date must be in the same year")
+		return &policypb.ValidateLeaveResponse{Ok: false}, nil
 	}
 
 	// Check if employee has enough days for a given year
@@ -64,7 +62,6 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 
 	if err != nil {
-		log.Printf("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 3")
 		return nil, status.Errorf(codes.Internal, "begin tx: %v", err)
 	}
 	defer func() { _ = tx.Rollback(ctx)} ()
@@ -78,7 +75,6 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 	`, req.EmployeeId, req.Year)
 
 	if err != nil {
-	  log.Printf("failed to insert or ensure balance row: %v", err)
     return nil, status.Errorf(codes.Internal, "ensure balance row: %v", err)
 	}
 
@@ -92,8 +88,7 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 	`, req.EmployeeId, req.Year).Scan(&remaining)
 
 	if err != nil {
-		log.Printf("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 4")
-		return nil, status.Errorf(codes.Internal, "read balance: %v", err)
+		return nil, status.Errorf(codes.Internal, "read balance row: %v", err)
 	}
 
 	// Compare remaining and requested
@@ -104,11 +99,27 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		log.Printf("🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴🔴 5")
 		return nil, status.Errorf(codes.Internal, "commit: %v", err)
 	}
 
-	return &policypb.ValidateLeaveResponse{Ok: true}, nil
+	// Check for vacation overlap in the same team
+
+	var count int
+	err = s.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM approved_team_leaves
+		WHERE team_id = $1
+			AND NOT (end_date < $2 OR start_date > $3)
+	`, req.TeamId, req.StartDate, req.EndDate).Scan(&count)
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "overlap check failed: %v", err)
+	}
+
+	if count > 0 {
+		return &policypb.ValidateLeaveResponse{Ok: false}, nil // overlap
+	}
+	return &policypb.ValidateLeaveResponse{Ok: true}, nil     // no overlap
 }
 
 func (s *Server) RecordApproval(ctx context.Context, req *policypb.RecordApprovalRequest) (*policypb.RecordApprovalResponse, error) {
