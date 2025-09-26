@@ -87,3 +87,5 @@ The full test suite can be found in:
 - **Databases:** Separate `*_test` databases are used so dev data is never touched.
 - **Reset:** `resetPolicyDb()` helper truncates policy tables between tests.
 - **Proof:** Please see the below screenshot of the passing tests.
+
+![E2E passing](./docs/e2e-passing.png)
