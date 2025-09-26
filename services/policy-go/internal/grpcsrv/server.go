@@ -123,5 +123,56 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 }
 
 func (s *Server) RecordApproval(ctx context.Context, req *policypb.RecordApprovalRequest) (*policypb.RecordApprovalResponse, error) {
+
+	log.Printf("[Policy] RecordApproval called: emp=%d team=%d start=%s end=%s year=%d days=%d", 
+		req.EmployeeId, req.TeamId, req.StartDate, req.EndDate, req.Year, req.Days,
+	)
+
+	const layout = "2006-01-02"
+	start, err := time.Parse(layout, req.StartDate)
+
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid start_date format")
+	}
+
+	end, err := time.Parse(layout, req.EndDate)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid end_date format")
+	}
+
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+		return nil, status.Errorf(codes.Internal, "begin tx: %v", err)
+	}
+
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Insert into approved_team_leaves
+
+	_, err = tx.Exec(ctx, `
+		INSERT INTO approved_team_leaves (team_id, employee_id, start_date, end_date)
+		VALUES ($1, $2, $3, $4)
+	`, req.TeamId, req.EmployeeId, start, end)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "insert approved leave: %v", err)
+	}
+
+	// Increment used days in employee_balances
+
+	_, err = tx.Exec(ctx, `
+		UPDATE employee_balances
+		SET used_days = used_days + $1
+		WHERE employee_id = $2 AND year = $3
+	`, req.Days, req.EmployeeId, req.Year)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "update used_days: %v", err)
+	}
+
+	// Commit transaction
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "commit: %v", err)
+	}
+
 	return &policypb.RecordApprovalResponse{}, nil
 }
