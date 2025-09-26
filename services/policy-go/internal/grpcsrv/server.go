@@ -59,6 +59,8 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 
 	requested := int(end.Sub(start).Hours()/24) + 1
 
+	log.Printf("requested=%d", requested)
+
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 
 	if err != nil {
@@ -87,6 +89,8 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 		WHERE employee_id = $1 AND year = $2
 	`, req.EmployeeId, req.Year).Scan(&remaining)
 
+	log.Printf("remaining=%d", remaining)
+
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "read balance row: %v", err)
 	}
@@ -111,6 +115,8 @@ func (s *Server) ValidateLeave(ctx context.Context, req *policypb.ValidateLeaveR
 		WHERE team_id = $1
 			AND NOT (end_date < $2 OR start_date > $3)
 	`, req.TeamId, req.StartDate, req.EndDate).Scan(&count)
+
+	log.Printf("overlap=%v", count)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "overlap check failed: %v", err)

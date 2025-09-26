@@ -1,10 +1,11 @@
-version: "3.9"
-
 services:
   postgres:
+    # use a separate data volume so init scripts run for tests
     volumes:
+      - pgdata_test:/var/lib/postgresql/data
       - ./pg-init/01-create-dbs.sql:/docker-entrypoint-initdb.d/01-create-dbs.sql:ro
       - ./pg-init/02-create-test-dbs.sql:/docker-entrypoint-initdb.d/02-create-test-dbs.sql:ro
+      - ./pg-init/03-policy-init.sql:/docker-entrypoint-initdb.d/03-policy-init.sql:ro
 
   policy-svc:
     environment:
@@ -13,3 +14,8 @@ services:
   leave-api:
     environment:
       DATABASE_URL: "postgresql://wa:wa@postgres:5432/leave_db_test?schema=public"
+      POLICY_GRPC_URL: "policy-svc:50051"
+      NODE_ENV: "test"
+
+volumes:
+  pgdata_test: {}
